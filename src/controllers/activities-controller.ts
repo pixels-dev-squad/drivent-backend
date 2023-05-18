@@ -18,7 +18,7 @@ export async function listActivitiesByDate(req: AuthenticatedRequest, res: Respo
   try {
     const { userId } = req;
     const { date } = req.body as Record<string, string>;
-    const formatedDate = moment(date, 'DD/MM').format('YYYY-MM-DD');
+    const formatedDate = moment(date, 'dddd, DD/MM').format('YYYY-MM-DD');
 
     const activities = await activitiesService.getActivitiesByDate(userId, formatedDate);
     return res.status(httpStatus.OK).send(activities);
