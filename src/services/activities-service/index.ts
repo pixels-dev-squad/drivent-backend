@@ -47,7 +47,7 @@ async function getActivitiesDays(userId: number) {
   const formatedDates: string[] = [];
 
   for (const dateObj of dates) {
-    const formatedDate = moment(dateObj.date).format('dddd, DD/MM');
+    const formatedDate = moment(dateObj.date).add(1, 'day').format('dddd, DD/MM');
     formatedDates.push(formatedDate);
   }
   return formatedDates;
