@@ -77,7 +77,7 @@ async function registerOnActivity(userId: number, activityId: number) {
 
   const userActivities = await activitiesRepository.getActivitiesByUserId(userId);
 
-  const conflictingActivity = userActivities.find((userActivity) => {
+  const conflictingActivity = userActivities.find((userActivity: any) => {
     const userActivityDate = new Date(userActivity.Activity.date);
     const userActivityStartsAt = new Date(userActivity.Activity.startsAt);
     const userActivityEndsAt = new Date(userActivity.Activity.endsAt);
