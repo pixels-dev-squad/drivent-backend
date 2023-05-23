@@ -1,7 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import dayjs from 'dayjs';
-import { create } from 'domain';
-import { Hotel } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -58,156 +56,78 @@ createTicketType()
     await prisma.$disconnect();
   });
 
-  const hotelsToCreate = [
-    {
-      name: 'Belmond Copacabana Palace',
-      image: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/13/f6/18/92/belmond-copacabana-palace.jpg?w=700&h=-1&s=1',
-    },
-    {
-      name: 'Grand Hyatt Rio de Janeiro',
-      image: 'https://assets.hyatt.com/content/dam/hyatt/hyattdam/images/2017/08/29/1013/Grand-Hyatt-Rio-de-Janeiro-P443-Pool.jpg/Grand-Hyatt-Rio-de-Janeiro-P443-Pool.16x9.jpg',
-    },
-    {
-      name: 'Hilton Copacabana Rio de Janeiro',
-      image: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/28/99/7c/20/exterior.jpg?w=700&h=-1&s=1',
-    },
-  ];
+const hotelsToCreate = [
+  {
+    name: 'Belmond Copacabana Palace',
+    image:
+      'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/13/f6/18/92/belmond-copacabana-palace.jpg?w=700&h=-1&s=1',
+  },
+  {
+    name: 'Grand Hyatt Rio de Janeiro',
+    image:
+      'https://assets.hyatt.com/content/dam/hyatt/hyattdam/images/2017/08/29/1013/Grand-Hyatt-Rio-de-Janeiro-P443-Pool.jpg/Grand-Hyatt-Rio-de-Janeiro-P443-Pool.16x9.jpg',
+  },
+  {
+    name: 'Hilton Copacabana Rio de Janeiro',
+    image: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/28/99/7c/20/exterior.jpg?w=700&h=-1&s=1',
+  },
+];
 
-
-  async function createHotel() {
-    let hotel = await prisma.hotel.findFirst();
-    if (!hotel) {
-      const hotel = await prisma.hotel.createMany({
-        data: hotelsToCreate,
-      });
-    }
-  
-    console.log({ hotel });
-  }
-  
-  createHotel()
-    .catch((e) => {
-      console.error(e);
-      process.exit(1);
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
+async function createHotel() {
+  let hotel = await prisma.hotel.count();
+  if (hotel !== 3) {
+    await prisma.hotel.deleteMany();
+    const hotels = await prisma.hotel.createMany({
+      data: hotelsToCreate,
     });
 
+    console.log({ hotels });
+  }
+}
 
-    const RoomstoCreate = [
-      {
-        name: 'Room 10',
-        capacity: 3,
-        hotelId: 4
-      },
-      {
-        name: 'Room 11',
-        capacity: 3,
-        hotelId: 4
-      },
-      {
-        name: 'Room 12',
-        capacity: 2,
-        hotelId:4
-      },
-      {
-        name: 'Room 13',
-        capacity: 2,
-        hotelId: 4
-      },
-      {
-        name: 'Room 14',
-        capacity: 3,
-        hotelId: 4
-      },
-      {
-        name: 'Room 15',
-        capacity: 2,
-        hotelId:4
-      },
+createHotel()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
 
+// const hotels = await prisma.hotel.findMany();
 
-      {
-        name: 'Room 01',
-        capacity: 1,
-        hotelId: 5
-      },
-      {
-        name: 'Room 02',
-        capacity: 1,
-        hotelId: 5
-      },
-      {
-        name: 'Room 03',
-        capacity: 2,
-        hotelId:5
-      },
-      {
-        name: 'Room 04',
-        capacity: 1,
-        hotelId: 5
-      },
-      {
-        name: 'Room 05',
-        capacity: 1,
-        hotelId: 5
-      },
-      {
-        name: 'Room 06',
-        capacity: 2,
-        hotelId:5
-      },
+async function createRooms() {
+  const consultRooms = await prisma.room.count();
+  if (consultRooms === 0) {
+    const hotels = await prisma.hotel.findMany();
 
+    const rooms: { name: string; capacity: number; hotelId: number }[] = [];
 
-      {
-        name: 'Room 100',
-        capacity: 1,
-        hotelId: 6
-      },
-      {
-        name: 'Room 101',
-        capacity: 2,
-        hotelId: 6
-      },
-      {
-        name: 'Room 102',
-        capacity: 3,
-        hotelId: 6
-      },
-      {
-        name: 'Room 104',
-        capacity: 3,
-        hotelId: 6
-      },
-      {
-        name: 'Room 105',
-        capacity: 2,
-        hotelId: 6
-      },
-      {
-        name: 'Room 106',
-        capacity: 1,
-        hotelId: 6
-      },
-    ];
+    hotels.forEach((hotel) => {
+      const floors = Math.floor(Math.random() * 10) + 1;
+      const roomsPerFloor = Math.floor(Math.random() * 16) + 5;
 
-    async function creatRooms() {
-      let room = await prisma.room.findFirst();
-      if (!room) {
-        const rooms = await prisma.room.createMany({
-          data: RoomstoCreate,
-        });
+      for (let floor = 0; floor < floors; floor++) {
+        const floorNumber = floor === 0 ? '' : floor;
+        for (let roomNumber = 1; roomNumber <= roomsPerFloor; roomNumber++) {
+          const roomName =
+            floorNumber === ''
+              ? `${roomNumber.toString().padStart(2, '0')}`
+              : roomNumber <= 9
+              ? `${floorNumber}0${roomNumber}`
+              : `${floorNumber}${roomNumber}`;
+          const capacity = Math.floor(Math.random() * 3) + 1;
+          rooms.push({ name: roomName, capacity, hotelId: hotel.id });
+        }
       }
-    
-      console.log({ room });
-    }
-    
-    creatRooms()
-      .catch((e) => {
-        console.error(e);
-        process.exit(1);
-      })
-      .finally(async () => {
-        await prisma.$disconnect();
-      });
+    });
+
+    const roomsCreated = await prisma.room.createMany({ data: rooms });
+
+    console.log({ roomsCreated });
+  }
+}
+
+createRooms()
+  .catch((e) => console.error(e))
+  .finally(() => prisma.$disconnect());
