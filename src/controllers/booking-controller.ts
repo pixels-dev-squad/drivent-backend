@@ -8,10 +8,7 @@ export async function listBooking(req: AuthenticatedRequest, res: Response, next
   try {
     const { userId } = req;
     const booking = await bookingService.getBooking(userId);
-    return res.status(httpStatus.OK).send({
-      id: booking.id,
-      Room: booking.Room,
-    });
+    return res.status(httpStatus.OK).send(booking);
   } catch (error) {
     next(error);
   }
