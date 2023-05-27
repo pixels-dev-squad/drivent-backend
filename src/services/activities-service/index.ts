@@ -5,10 +5,8 @@ import enrollmentRepository from '@/repositories/enrollment-repository';
 import ticketsRepository from '@/repositories/tickets-repository';
 
 async function verifyPayment(userId: number) {
-  console.log(userId);
   const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
   if (!enrollment) {
-    console.log(!enrollment);
     throw notFoundError();
   }
 
@@ -45,7 +43,7 @@ function transformActivitiesArray(activities: any[]): any[] {
 }
 
 async function getActivitiesDays(userId: number) {
-  verifyPayment(userId);
+  await verifyPayment(userId);
 
   const dates = await activitiesRepository.getActivitiesDays();
   const formatedDates: string[] = [];
