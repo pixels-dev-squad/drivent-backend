@@ -1,221 +1,51 @@
-import faker from '@faker-js/faker';
+import request from 'supertest';
+import moment from 'moment';
 import httpStatus from 'http-status';
-import * as jwt from 'jsonwebtoken';
-import supertest from 'supertest';
-import { TicketStatus } from '@prisma/client';
-import {
-  createEnrollmentWithAddress,
-  createUser,
-  createTicketType,
-  createTicket,
-  createPayment,
-  generateCreditCardData,
-} from '../factories';
-import { cleanDb, generateValidToken } from '../helpers';
-import { prisma } from '@/config';
-import app, { init } from '@/app';
+import { activityRouter } from '@/routers';
+import activitiesService from '@/services/activities-service';
 
-beforeAll(async () => {
-  await init();
-});
+jest.mock('@/services/activities-service', () => ({
+  getActivitiesDays: jest.fn(),
+}));
 
-beforeEach(async () => {
-  await cleanDb();
-});
-
-const server = supertest(app);
-
-describe('GET /payments', () => {
-  it('should respond with status 401 if no token is given', async () => {
-    const response = await server.get('/payments');
-
-    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+describe('GET /activities/days', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it('should respond with status 401 if given token is not valid', async () => {
-    const token = faker.lorem.word();
+  it('should return an array of formatted dates when the request is valid', async () => {
+    const userId = 123;
+    const mockDates = [{ date: new Date('2023-05-26') }, { date: new Date('2023-05-27') }];
+    const expectedFormattedDates = [
+      moment('2023-05-26').add(1, 'day').format('dddd, DD/MM'),
+      moment('2023-05-27').add(1, 'day').format('dddd, DD/MM'),
+    ];
 
-    const response = await server.get('/payments').set('Authorization', `Bearer ${token}`);
+    (activitiesService.getActivitiesDays as jest.Mock).mockResolvedValueOnce(mockDates);
 
-    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+    const response = await request(activityRouter).get('/activities/days').set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(httpStatus.OK);
+    expect(response.body).toEqual(expectedFormattedDates);
+    expect(activitiesService.getActivitiesDays).toHaveBeenCalledWith(userId);
   });
 
-  it('should respond with status 401 if there is no session for given token', async () => {
-    const userWithoutSession = await createUser();
-    const token = jwt.sign({ userId: userWithoutSession.id }, process.env.JWT_SECRET);
+  it('should pass the error to the error handling middleware when an error occurs in the service', async () => {
+    const userId = 123;
+    const errorMessage = 'Error retrieving activities days';
 
-    const response = await server.get('/payments').set('Authorization', `Bearer ${token}`);
+    (activitiesService.getActivitiesDays as jest.Mock).mockImplementationOnce(() => {
+      throw new Error(errorMessage);
+    });
 
-    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
+    const nextMock = jest.fn();
+
+    const response = await request(activityRouter).get('/activities/days').set('Authorization', 'Bearer valid-token');
+
+    expect(nextMock).toHaveBeenCalledTimes(1);
+    expect(nextMock).toHaveBeenCalledWith(new Error(errorMessage));
+    expect(response.status).toBe(httpStatus.INTERNAL_SERVER_ERROR);
+    expect(response.body).toHaveProperty('message', errorMessage);
+    expect(activitiesService.getActivitiesDays).toHaveBeenCalledWith(userId);
   });
-
-  describe('when token is valid', () => {
-    it('should respond with status 400 if query param ticketId is missing', async () => {
-      const token = await generateValidToken();
-
-      const response = await server.get('/payments').set('Authorization', `Bearer ${token}`);
-
-      expect(response.status).toEqual(httpStatus.BAD_REQUEST);
-    });
-
-    it('should respond with status 404 when given ticket doesnt exist', async () => {
-      const user = await createUser();
-      const token = await generateValidToken(user);
-      await createEnrollmentWithAddress(user);
-
-      const response = await server.get('/payments?ticketId=1').set('Authorization', `Bearer ${token}`);
-
-      expect(response.status).toEqual(httpStatus.NOT_FOUND);
-    });
-
-    it('should respond with status 401 when user doesnt own given ticket', async () => {
-      const user = await createUser();
-      const token = await generateValidToken(user);
-      await createEnrollmentWithAddress(user);
-      const ticketType = await createTicketType();
-
-      const otherUser = await createUser();
-      const otherUserEnrollment = await createEnrollmentWithAddress(otherUser);
-      const ticket = await createTicket(otherUserEnrollment.id, ticketType.id, TicketStatus.RESERVED);
-
-      const response = await server.get(`/payments?ticketId=${ticket.id}`).set('Authorization', `Bearer ${token}`);
-
-      expect(response.status).toEqual(httpStatus.UNAUTHORIZED);
-    });
-
-    it('should respond with status 200 and with payment data', async () => {
-      const user = await createUser();
-      const token = await generateValidToken(user);
-      const enrollment = await createEnrollmentWithAddress(user);
-      const ticketType = await createTicketType();
-      const ticket = await createTicket(enrollment.id, ticketType.id, TicketStatus.RESERVED);
-
-      const payment = await createPayment(ticket.id, ticketType.price);
-
-      const response = await server.get(`/payments?ticketId=${ticket.id}`).set('Authorization', `Bearer ${token}`);
-
-      expect(response.status).toEqual(httpStatus.OK);
-      expect(response.body).toEqual({
-        id: expect.any(Number),
-        ticketId: ticket.id,
-        value: ticketType.price,
-        cardIssuer: payment.cardIssuer,
-        cardLastDigits: payment.cardLastDigits,
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String),
-      });
-    });
-  });
-});
-
-describe('POST /payments/process', () => {
-  it('should respond with status 401 if no token is given', async () => {
-    const response = await server.post('/payments/process');
-
-    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
-  });
-
-  it('should respond with status 401 if given token is not valid', async () => {
-    const token = faker.lorem.word();
-
-    const response = await server.post('/payments/process').set('Authorization', `Bearer ${token}`);
-
-    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
-  });
-
-  it('should respond with status 401 if there is no session for given token', async () => {
-    const userWithoutSession = await createUser();
-    const token = jwt.sign({ userId: userWithoutSession.id }, process.env.JWT_SECRET);
-
-    const response = await server.post('/payments/process').set('Authorization', `Bearer ${token}`);
-
-    expect(response.status).toBe(httpStatus.UNAUTHORIZED);
-  });
-
-  describe('when token is valid', () => {
-    it('should respond with status 400 if body param ticketId is missing', async () => {
-      const user = await createUser();
-      const token = await generateValidToken(user);
-      const enrollment = await createEnrollmentWithAddress(user);
-      const ticketType = await createTicketType();
-      await createTicket(enrollment.id, ticketType.id, TicketStatus.RESERVED);
-
-      const body = { cardData: generateCreditCardData() };
-
-      const response = await server.post('/payments/process').set('Authorization', `Bearer ${token}`).send(body);
-
-      expect(response.status).toEqual(httpStatus.BAD_REQUEST);
-    });
-
-    it('should respond with status 400 if body param cardData is missing', async () => {
-      const user = await createUser();
-      const token = await generateValidToken(user);
-      const enrollment = await createEnrollmentWithAddress(user);
-      const ticketType = await createTicketType();
-      const ticket = await createTicket(enrollment.id, ticketType.id, TicketStatus.RESERVED);
-
-      const body = { ticketId: ticket.id };
-
-      const response = await server.post('/payments/process').set('Authorization', `Bearer ${token}`).send(body);
-
-      expect(response.status).toEqual(httpStatus.BAD_REQUEST);
-    });
-
-    it('should respond with status 404 when given ticket doesnt exist', async () => {
-      const user = await createUser();
-      const token = await generateValidToken(user);
-      await createEnrollmentWithAddress(user);
-
-      const body = { ticketId: 1, cardData: generateCreditCardData() };
-
-      const response = await server.post('/payments/process').set('Authorization', `Bearer ${token}`).send(body);
-
-      expect(response.status).toEqual(httpStatus.NOT_FOUND);
-    });
-
-    it('should respond with status 401 when user doesnt own given ticket', async () => {
-      const user = await createUser();
-      const token = await generateValidToken(user);
-      await createEnrollmentWithAddress(user);
-      const ticketType = await createTicketType();
-
-      const otherUser = await createUser();
-      const otherUserEnrollment = await createEnrollmentWithAddress(otherUser);
-      const ticket = await createTicket(otherUserEnrollment.id, ticketType.id, TicketStatus.RESERVED);
-
-      const body = { ticketId: ticket.id, cardData: generateCreditCardData() };
-
-      const response = await server.post('/payments/process').set('Authorization', `Bearer ${token}`).send(body);
-
-      expect(response.status).toEqual(httpStatus.UNAUTHORIZED);
-    });
-
-    it('should respond with status 200 and with payment data', async () => {
-      const user = await createUser();
-      const token = await generateValidToken(user);
-      const enrollment = await createEnrollmentWithAddress(user);
-      const ticketType = await createTicketType();
-      const ticket = await createTicket(enrollment.id, ticketType.id, TicketStatus.RESERVED);
-
-      const body = { ticketId: ticket.id, cardData: generateCreditCardData() };
-
-      const response = await server.post('/payments/process').set('Authorization', `Bearer ${token}`).send(body);
-
-      expect(response.status).toEqual(httpStatus.OK);
-      expect(response.body).toEqual({
-        id: expect.any(Number),
-        ticketId: ticket.id,
-        value: ticketType.price,
-        cardIssuer: expect.any(String),
-        cardLastDigits: expect.any(String),
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String),
-      });
-    });
-  });
-});
-
-afterAll(async () => {
-  await cleanDb();
-  await prisma.$disconnect();
 });
