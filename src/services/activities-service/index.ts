@@ -41,7 +41,7 @@ function transformActivitiesArray(activities: any[]): any[] {
 }
 
 async function getActivitiesDays(userId: number) {
-  verifyPayment(userId);
+  await verifyPayment(userId);
 
   const dates = await activitiesRepository.getActivitiesDays();
   const formatedDates: string[] = [];
