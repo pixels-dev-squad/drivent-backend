@@ -5,8 +5,12 @@ import enrollmentRepository from '@/repositories/enrollment-repository';
 import ticketsRepository from '@/repositories/tickets-repository';
 
 async function verifyPayment(userId: number) {
+  console.log(userId);
   const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
-  if (!enrollment) throw notFoundError();
+  if (!enrollment) {
+    console.log(!enrollment);
+    throw notFoundError();
+  }
 
   const ticket = await ticketsRepository.findTicketByEnrollmentId(enrollment.id);
   if (!ticket || ticket.status === 'RESERVED' || ticket.TicketType.isRemote) {
