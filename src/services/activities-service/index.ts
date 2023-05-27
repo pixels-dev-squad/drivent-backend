@@ -56,7 +56,7 @@ async function getActivitiesDays(userId: number) {
 }
 
 async function getActivitiesByDate(userId: number, date: string) {
-  verifyPayment(userId);
+  await verifyPayment(userId);
 
   const activities = await activitiesRepository.getActivitiesByDate(date);
   const result = transformActivitiesArray(activities);
@@ -65,14 +65,14 @@ async function getActivitiesByDate(userId: number, date: string) {
 }
 
 async function getUserActivities(userId: number) {
-  verifyPayment(userId);
+  await verifyPayment(userId);
 
   const activities = await activitiesRepository.getActivitiesByUserId(userId);
   return activities;
 }
 
 async function registerOnActivity(userId: number, activityId: number) {
-  verifyPayment(userId);
+  await verifyPayment(userId);
 
   const activity = await activitiesRepository.getActivityById(activityId);
   if (!activity) throw notFoundError();
