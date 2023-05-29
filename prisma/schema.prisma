@@ -149,6 +149,8 @@ model Activity {
   startsAt           DateTime             @db.Time
   endsAt             DateTime             @db.Time
   Activities_booking Activities_booking[]
+
+  @@index([date], name: "idx_activity_date")
 }
 
 model Activities_booking {
